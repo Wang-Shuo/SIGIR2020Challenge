@@ -7,6 +7,8 @@
 The organizer released approximately 99K product listings in tsv format, including 84,916 samples for training, 937 samples for phase 1 testing and 8435 samples for phase 2 testing. The training dataset consists of product titles, descriptions, images and their corresponding product type codes. There are 27 product categories in the training dataset and the number of product samples in each category ranges from 764 to 10,209. The frequency distribution of categories in the training dataset is shown in the following figure.
 ![category frequency distribution](assets/data_dist.png)
 
-
+## Overview
+We employed a decision-level fusion scheme to leverage mulitmodal product information. Specifically, the modal-specific classifiers are built from textual and image modal data respectively in the first stage. Then the late fusion strategy is learned from the class probabilities predicted by each modal classifier in the second stage. The overview of the proposed method is shown in the following figure.
+![model overview](assets/overview.png)
 
 ## Reference
