@@ -8,10 +8,5 @@ The organizer released approximately 99K product listings in tsv format, includi
 ![category frequency distribution](assets/data_dist.png)
 
 
-## Preprocess
-We divide the full 84916 labeled samples randomly into training and validation set at a ratio of 9:1. For different modal data, we perform some basic preprocessing techniques as follows:
-- **Text**: We simply remove some HTML tags like `L&#39` and `<p>` from product title and description texts.  
-- **Image**: The images are preprocessed during the training process of image classifier. The preprocessing techniques includes resize, random crop, rotation and horizontal flip.
-
 
 ## Reference
