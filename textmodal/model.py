@@ -9,7 +9,7 @@ class TextOnly(nn.Module):
     def __init__(self, text_ptm_dir, text_ft_dim, num_classes):
         super(TextOnly, self).__init__()
         self.camembert = CamembertModel.from_pretrained(text_ptm_dir)
-        self.classifier = nn.Linear(text_ft_dim, num_classes, bias = True)
+        self.classifier = nn.Linear(text_ft_dim, num_classes, bias = False)
 
     def forward(self, input_ids, attention_mask = None, token_type_ids = None):
         outputs = self.camembert(input_ids, attention_mask = attention_mask, token_type_ids = token_type_ids)

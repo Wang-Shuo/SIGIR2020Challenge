@@ -32,16 +32,14 @@ from transformers.optimization import AdamW, get_linear_schedule_with_warmup, ge
 
 from model import TextOnly
 from dataloader import ECTextDataset
-from utils import FocalLoss
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_dir', default='/home/competition/SIGIR2020/Task_1/data/preprocessed/', help='preprocessed dataset directory')
-parser.add_argument('--text_ptm_dir', default='/home/biye/Pretrained_models/camembert-large', help='pretrained language model directory')
-# parser.add_argument('--text_ptm_dir', default='/home/competition/SIGIR2020/pretrained/camembert-base', help='pretrained language model directory')
+parser.add_argument('--data_dir', default='../data/preprocessed/', help='preprocessed dataset directory')
+parser.add_argument('--text_ptm_dir', default='../pretrained/camembert-base', help='pretrained language model directory')
 parser.add_argument('--batch_size', type=int, default=128, help='input batch size')
 parser.add_argument('--num_classes', type=int, default=27, help='the number of classes')
-parser.add_argument('--text_ft_dim', type=int, default=1024, help='the dim of text features')
-parser.add_argument('--result_dir', default='/home/competition/SIGIR2020/Task_1/textmodal/results', help='directory to store results')
+parser.add_argument('--text_ft_dim', type=int, default=768, help='the dim of text features')
+parser.add_argument('--result_dir', default='results/', help='directory to store results')
 parser.add_argument('--epoch', type=int, default=40, help='the number of epochs to train for')
 parser.add_argument('--lr', type=float, default=3e-5, help='learning rate')
 parser.add_argument('--lr_dc', type=float, default=0.1, help='learning rate decay rate')
@@ -51,8 +49,7 @@ parser.add_argument('--seed', type=int, default=2021, help='seed for random and 
 args = parser.parse_args()
 print(args)
 
-device = torch.device('cuda:2' if torch.cuda.is_available() else 'cpu')
-# device = torch.device('cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def setseed(seed):
     random.seed(seed)
@@ -67,7 +64,7 @@ def setseed(seed):
 def main():
     setseed(args.seed)
     print('Loading data...')
-    train = pd.read_csv(args.data_dir + 'train_0_clean_part_aug_by_trans.tsv', sep = '\t')
+    train = pd.read_csv(args.data_dir + 'train_0_clean.tsv', sep = '\t')
     valid = pd.read_csv(args.data_dir + 'valid_0_clean.tsv', sep = '\t')
 
     train['Description'] = train['Description'].fillna('')
@@ -81,7 +78,7 @@ def main():
     valid_loader = DataLoader(valid_data, batch_size = args.batch_size, shuffle = False, num_workers = 8)
 
     model = TextOnly(args.text_ptm_dir, args.text_ft_dim, args.num_classes).to(device)
-    model = nn.DataParallel(model, device_ids=[2, 3])
+    model = nn.DataParallel(model, device_ids=[0, 1])
 
     if args.test:
         ckpt = torch.load(args.result_dir + '/best_checkpoint_bertpooled_seed2021_bs128_lr5e-05_ep30_numiter17910_warmup1791.pth.tar')
@@ -89,17 +86,13 @@ def main():
         acc, macro_f1, all_preds = validate(valid_loader, model)
         print('Validation Best Results: accuracy: {:.4f}, macro f1: {:.4f}'.format(acc, macro_f1))
         valid['preds'] = all_preds
-        valid.to_csv(args.result_dir + '/valid_0_preds_camembert_base.tsv', index = False, sep = '\t')
+        valid.to_csv(args.result_dir + '/valid_0_preds.tsv', index = False, sep = '\t')
         return
     
     criterion = nn.CrossEntropyLoss()
-    # criterion = FocalLoss(gamma = 3)
-    # optimizer = optim.Adam(model.parameters(), args.lr)
-    # scheduler = StepLR(optimizer, step_size = args.lr_dc_step, gamma = args.lr_dc)
     optimizer = AdamW(model.parameters(), args.lr)
     num_training_steps = int(train.shape[0] / args.batch_size) * args.epoch
     num_warmup_steps = int(num_training_steps * 0.1)
-    # print(train.shape[0], num_training_steps, num_warmup_steps)
     # scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps = num_warmup_steps, num_training_steps = num_training_steps, num_cycles = 6)
     scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps = num_warmup_steps, num_training_steps = num_training_steps)
 
@@ -123,7 +116,7 @@ def main():
 
         if macro_f1 > best_f1:
             best_f1 = macro_f1
-            torch.save(ckpt_dict, args.result_dir + '/best_checkpoint_bertpooled_camemlarge_part_aug_trans_seed{}_bs{}_lr{}_ep{}_numiter{}_warmup{}.pth.tar'.format(
+            torch.save(ckpt_dict, args.result_dir + '/best_checkpoint_seed{}_bs{}_lr{}_ep{}_numiter{}_warmup{}.pth.tar'.format(
                                                     args.seed, args.batch_size, args.lr, args.epoch, num_training_steps, num_warmup_steps))
 
         print('Epoch {} validation: accuracy: {:.4f}, macro f1: {:.4f}, best macro f1: {:.4f}'.format(epoch, acc, macro_f1, best_f1))
@@ -131,7 +124,6 @@ def main():
 
 def trainForEpoch(train_loader, model, optimizer, scheduler, epoch, num_epochs, criterion, log_aggr=1):
     model.train()
-
     sum_epoch_loss = 0
 
     start = time.time()

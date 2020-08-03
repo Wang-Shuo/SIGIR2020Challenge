@@ -23,23 +23,17 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
-import torch.optim as optim
-from torchvision import transforms
-from torch.optim.lr_scheduler import StepLR
-from torch.autograd import Variable
 from torch.backends import cudnn
 
 from model import TextOnly
 from dataloader import ECTextTestDataset
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_dir', default='/home/competition/SIGIR2020/Raw_data', help='preprocessed dataset directory')
-parser.add_argument('--text_ptm_dir', default='/home/competition/SIGIR2020/pretrained/camembert-base', help='pretrained language model directory')
-parser.add_argument('--img_ptm_path', default='/home/competition/SIGIR2020/pretrained/resnet152-b121ed2d.pth', help='pretrained image model path')
-parser.add_argument('--result_dir', default='/home/competition/SIGIR2020/Task_1/textmodal/results', help='directory to store results')
-parser.add_argument('--batch_size', type=int, default=64, help='input batch size')
+parser.add_argument('--data_dir', default='../data/', help='dataset directory')
+parser.add_argument('--text_ptm_dir', default='../pretrained/camembert-base', help='pretrained language model directory')
+parser.add_argument('--result_dir', default='results/', help='directory to store results')
+parser.add_argument('--batch_size', type=int, default=128, help='input batch size')
 parser.add_argument('--num_classes', type=int, default=27, help='the number of classes')
-parser.add_argument('--img_ft_dim', type=int, default=2048, help='the dim of image features')
 parser.add_argument('--text_ft_dim', type=int, default=768, help='the dim of text features')
 args = parser.parse_args()
 print(args)
@@ -48,23 +42,17 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def main():
     print('Loading data...')
-    test = pd.read_csv(args.data_dir + '/data/x_test_task1_phase1_clean.tsv', sep = '\t')
+    test = pd.read_csv(args.data_dir + 'preprocessed/x_test_task1_phase1_clean.tsv', sep = '\t')
 
     test['Description'] = test['Description'].fillna('')
     sub_columns = ['Title', 'Description', 'Image_id', 'Product_id']
     
-    img_transform = transforms.Compose([
-        transforms.Resize(224),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-    
-    test_img_dir = os.path.join(args.data_dir, 'image/image_test/image_test_task1_phase1') 
     test_data = ECTextTestDataset(test[sub_columns].values, args.text_ptm_dir)
     test_loader = DataLoader(test_data, batch_size = args.batch_size, shuffle = False, num_workers = 8)
 
     model = TextOnly(args.text_ptm_dir, args.text_ft_dim, args.num_classes).to(device)
     model = nn.DataParallel(model, device_ids=[0, 1])
-    ckpt = torch.load(args.result_dir + '/best_checkpoint_bertpooled_focalloss_bs128_lr5e-05_ep30_numiter17910_warmup1791.pth.tar')
+    ckpt = torch.load(args.result_dir + '/best_checkpoint_bs128_lr5e-05_ep30_numiter17910_warmup1791.pth.tar')
     model.load_state_dict(ckpt['state_dict'])
     
     all_preds = inference(test_loader, model)
@@ -74,9 +62,8 @@ def main():
     with open('../data/preprocessed/idx2code.json', 'r') as f:
         idx2code = eval(json.load(f))
     Y_test_df['Prdtypecode'] = Y_test_df['Prdtypecode'].map(idx2code)
-    Y_test_df.to_csv(args.result_dir + '/y_test_task1_phase1_pred_bertpooled_focalloss_warmup.tsv', index = False, sep = '\t')
-    Y_test_df.to_excel(args.result_dir + '/y_test_task1_phase1_pred_bertpooled_focalloss_warmup.xlsx', index = False, encoding = 'utf-8')
-    
+    Y_test_df.to_csv(args.result_dir + '/y_test_task1_phase1_pred.tsv', index = False, sep = '\t')
+     
 
 def inference(valid_loader, model):
     model.eval()
